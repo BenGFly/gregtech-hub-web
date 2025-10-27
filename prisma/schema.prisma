@@ -1,0 +1,134 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  minecraftUUID String  @unique
+  username     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  tasks        Task[]
+  questProgress QuestProgress[]
+}
+
+model QuestLine {
+  id          String   @id @default(cuid())
+  questLineId String   @unique // UUID from Better Questing
+  name        String
+  description String?
+  order       Int      @default(0)
+  
+  quests      Quest[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Quest {
+  id           String   @id @default(cuid())
+  questId      String   @unique // UUID from Better Questing
+  name         String
+  description  String?
+  
+  questLineId  String?
+  questLine    QuestLine? @relation(fields: [questLineId], references: [id])
+  
+  taskLogic    String   @default("AND") // AND, OR, XOR, etc.
+  tasks        Json?    // Array de tasks con detalles
+  rewards      Json?    // Array de recompensas
+  
+  // Dependencias (pre-requisitos)
+  prerequisites String[] // Array de questIds que deben completarse antes
+  
+  // Progreso de usuarios
+  progress     QuestProgress[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  assignedToId String?
+  assignedTo  User?    @relation(fields: [assignedToId], references: [id])
+  
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  questId     String?
+  questName   String?
+  
+  tags        String[]
+  materials   Material[]
+}
+
+model Material {
+  id          String   @id @default(cuid())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      String
+  name        String
+  quantity    Int
+  obtained    Int      @default(0)
+  unit        String?  // e.g., "items", "buckets", "stacks"
+  itemId      String?  // Minecraft item ID like "gregtech:plateDenseSteel"
+  nbtData     String?  // NBT data if needed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model QuestProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  questId     String
+  quest       Quest?   @relation(fields: [questId], references: [questId])
+  
+  questName   String
+  questLine   String?
+  completed   Boolean  @default(false)
+  unlocked    Boolean  @default(false) // Si está disponible para el jugador
+  
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([userId, questId])
+}
+
+model SyncLog {
+  id          String   @id @default(cuid())
+  userId      String
+  action      String
+  data        Json
+  timestamp   DateTime @default(now())
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
